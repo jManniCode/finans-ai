@@ -82,7 +82,7 @@ def main():
             if "sources" in message:
                 with st.expander("Visa källor"):
                     for source in message["sources"]:
-                        st.text(source)
+                        st.markdown(source)
 
     if prompt := st.chat_input("Ask a question about the financial reports"):
         # Display user message
@@ -106,13 +106,14 @@ def main():
                             for doc in response["context"][:5]:
                                 # Add 1 to page number for user-friendly display (assuming 0-indexed)
                                 page = doc.metadata.get('page', -1) + 1
-                                source_info = f"Sida {page}: {doc.page_content[:200].replace(chr(10), ' ')}..."
+                                # Show full content to allow verifying numbers
+                                source_info = f"**Sida {page}:**\n{doc.page_content}"
                                 sources_text.append(source_info)
 
                         if sources_text:
                             with st.expander("Visa källor"):
                                 for source in sources_text:
-                                    st.text(source)
+                                    st.markdown(source)
 
                         st.session_state.messages.append({
                             "role": "assistant",

@@ -102,8 +102,8 @@ def main():
                         # Process sources
                         sources_text = []
                         if "context" in response:
-                            # Limit to top 5 sources to reduce clutter
-                            for doc in response["context"][:5]:
+                            # Display all retrieved sources so the user can verify all citations
+                            for doc in response["context"]:
                                 # Add 1 to page number for user-friendly display (assuming 0-indexed)
                                 page = doc.metadata.get('page', -1) + 1
                                 # Show full content to allow verifying numbers

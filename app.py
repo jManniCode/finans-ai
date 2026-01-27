@@ -37,7 +37,8 @@ def render_chart(chart_data):
         y_label = chart_data.get("y_label")
         data = chart_data.get("data", [])
 
-        labels = [item["label"] for item in data]
+        # Ensure labels are strings to force categorical axis
+        labels = [str(item["label"]) for item in data]
         values = [item["value"] for item in data]
 
         fig = go.Figure()
@@ -50,7 +51,8 @@ def render_chart(chart_data):
         fig.update_layout(
             title=title,
             xaxis_title=x_label,
-            yaxis_title=y_label
+            yaxis_title=y_label,
+            xaxis=dict(type='category') # Force categorical axis to avoid decimal years
         )
 
         st.plotly_chart(fig)
@@ -114,7 +116,13 @@ def main():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
             if "chart_data" in message:
-                render_chart(message["chart_data"])
+                # Handle single chart or list of charts
+                data = message["chart_data"]
+                if isinstance(data, list):
+                    for chart in data:
+                        render_chart(chart)
+                else:
+                    render_chart(data)
             if "sources" in message:
                 with st.expander("Visa källor"):
                     for source in message["sources"]:
@@ -135,21 +143,25 @@ def main():
                         answer = response['answer']
 
                         # Extract JSON
-                        chart_data = None
-                        json_match = re.search(r'```json\s*(\{.*?\})\s*```', answer, re.DOTALL)
-                        if json_match:
-                            json_str = json_match.group(1)
+                        chart_data_list = []
+                        # Find all JSON blocks
+                        json_matches = re.finditer(r'```json\s*(\{.*?\})\s*```', answer, re.DOTALL)
+
+                        for match in json_matches:
+                            json_str = match.group(1)
                             try:
-                                chart_data = json.loads(json_str)
+                                data = json.loads(json_str)
+                                chart_data_list.append(data)
                                 # Remove the JSON block from the answer
-                                answer = answer.replace(json_match.group(0), "").strip()
+                                answer = answer.replace(match.group(0), "")
                             except json.JSONDecodeError:
                                 pass
 
+                        answer = answer.strip()
                         st.markdown(answer)
 
-                        if chart_data:
-                            render_chart(chart_data)
+                        for chart in chart_data_list:
+                            render_chart(chart)
 
                         # Process sources
                         sources_text = []
@@ -171,7 +183,7 @@ def main():
                             "role": "assistant",
                             "content": answer,
                             "sources": sources_text,
-                            "chart_data": chart_data
+                            "chart_data": chart_data_list
                         })
                     except Exception as e:
                         st.error(f"Error generating response: {e}")

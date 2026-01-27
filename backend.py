@@ -57,7 +57,7 @@ def create_vector_store(chunks):
     # but explicitly 'models/embedding-001' is a safe bet for compatibility.
     # The user asked to use the default, so we'll instantiate it without arguments
     # or with the standard one if needed.
-    embeddings = GoogleGenerativeAIEmbeddings()
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
     # Create vector store in memory
     vector_store = Chroma.from_documents(chunks, embeddings)
@@ -88,16 +88,16 @@ def get_conversational_chain(vector_store):
         "you MUST generate a JSON object representing this data at the very end of your response. "
         "The JSON must be enclosed in triple backticks with 'json' identifier, like this:\n"
         "```json\n"
-        "{\n"
+        "{{\n"
         "    \"type\": \"bar\" or \"line\",\n"
         "    \"title\": \"Chart Title\",\n"
         "    \"x_label\": \"X Axis Label\",\n"
         "    \"y_label\": \"Y Axis Label\",\n"
         "    \"data\": [\n"
-        "        {\"label\": \"2020\", \"value\": 100},\n"
-        "        {\"label\": \"2021\", \"value\": 150}\n"
+        "        {{\"label\": \"2020\", \"value\": 100}},\n"
+        "        {{\"label\": \"2021\", \"value\": 150}}\n"
         "    ]\n"
-        "}\n"
+        "}}\n"
         "```\n"
         "Ensure the graph title and labels are in the same language as the answer. "
         "Do not include this JSON if the data is not suitable for a chart."

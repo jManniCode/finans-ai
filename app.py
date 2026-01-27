@@ -79,6 +79,10 @@ def main():
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
+            if "sources" in message:
+                with st.expander("Visa källor"):
+                    for source in message["sources"]:
+                        st.text(source)
 
     if prompt := st.chat_input("Ask a question about the financial reports"):
         # Display user message
@@ -94,7 +98,26 @@ def main():
                         response = st.session_state.chain.invoke({"input": prompt})
                         answer = response['answer']
                         st.markdown(answer)
-                        st.session_state.messages.append({"role": "assistant", "content": answer})
+
+                        # Process sources
+                        sources_text = []
+                        if "context" in response:
+                            for doc in response["context"]:
+                                # Add 1 to page number for user-friendly display (assuming 0-indexed)
+                                page = doc.metadata.get('page', -1) + 1
+                                source_info = f"Sida {page}: {doc.page_content[:200].replace(chr(10), ' ')}..."
+                                sources_text.append(source_info)
+
+                        if sources_text:
+                            with st.expander("Visa källor"):
+                                for source in sources_text:
+                                    st.text(source)
+
+                        st.session_state.messages.append({
+                            "role": "assistant",
+                            "content": answer,
+                            "sources": sources_text
+                        })
                     except Exception as e:
                         st.error(f"Error generating response: {e}")
         else:

@@ -63,7 +63,7 @@ def get_conversational_chain(vector_store):
     """
     llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.3)
 
-    retriever = vector_store.as_retriever()
+    retriever = vector_store.as_retriever(search_kwargs={"k": 20})
 
     # Prompt template for financial summarization and Q&A
     system_prompt = (

@@ -69,7 +69,9 @@ def get_conversational_chain(vector_store):
     system_prompt = (
         "You are an expert financial analyst assistant. "
         "Use the following pieces of retrieved context to answer the question. "
+        "Answer in the same language as the user's question. "
         "If the user asks for a summary, provide a concise and factual financial summary based on the context. "
+        "If the user asks about the sentiment, assess the overall tone (e.g., positive, negative, neutral, cautious) based on the context and explain your reasoning. "
         "When answering, you MUST cite the source page number for every fact you mention. "
         "Format citations as [Page X]. Example: 'Revenue increased by 10% [Page 3]'. "
         "If the answer is not in the context, say that you don't know. "

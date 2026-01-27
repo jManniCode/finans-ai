@@ -1,0 +1,7 @@
+langchain
+langchain-google-genai  # Eftersom finans-ai repo:t nämnde Gemini
+streamlit
+pypdf
+plotly
+python-dotenv
+chromadb  # Eller FAISS, för att spara text-chunks (vektordatabas)

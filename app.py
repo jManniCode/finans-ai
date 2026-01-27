@@ -2,6 +2,10 @@ import streamlit as st
 import os
 import shutil
 import sys
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Try to import backend, handling missing dependencies gracefully
 try:

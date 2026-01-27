@@ -1,7 +1,20 @@
 import streamlit as st
 import os
 import shutil
-import backend
+import sys
+
+# Try to import backend, handling missing dependencies gracefully
+try:
+    import backend
+except ImportError as e:
+    # Check specifically for langchain_community or other likely missing packages
+    if "langchain_community" in str(e):
+        st.error("Missing dependency: `langchain-community`.")
+        st.error("Please run: `pip install -r requirements.txt` to install all required packages.")
+        st.stop()
+    else:
+        # Re-raise other ImportErrors to avoid hiding legitimate bugs
+        raise e
 
 # Constants
 TEMP_PDF_DIR = "temp_pdf"

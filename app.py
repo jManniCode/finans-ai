@@ -102,7 +102,8 @@ def main():
                         # Process sources
                         sources_text = []
                         if "context" in response:
-                            for doc in response["context"]:
+                            # Limit to top 5 sources to reduce clutter
+                            for doc in response["context"][:5]:
                                 # Add 1 to page number for user-friendly display (assuming 0-indexed)
                                 page = doc.metadata.get('page', -1) + 1
                                 source_info = f"Sida {page}: {doc.page_content[:200].replace(chr(10), ' ')}..."

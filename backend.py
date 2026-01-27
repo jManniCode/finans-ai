@@ -70,6 +70,8 @@ def get_conversational_chain(vector_store):
         "You are an expert financial analyst assistant. "
         "Use the following pieces of retrieved context to answer the question. "
         "If the user asks for a summary, provide a concise and factual financial summary based on the context. "
+        "When answering, you MUST cite the source page number for every fact you mention. "
+        "Format citations as [Page X]. Example: 'Revenue increased by 10% [Page 3]'. "
         "If the answer is not in the context, say that you don't know. "
         "Keep the answer concise."
         "\n\n"

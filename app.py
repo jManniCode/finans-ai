@@ -2,6 +2,9 @@ import streamlit as st
 import os
 import shutil
 import sys
+import json
+import re
+import plotly.graph_objects as go
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -22,6 +25,37 @@ except ImportError as e:
 
 # Constants
 TEMP_PDF_DIR = "temp_pdf"
+
+def render_chart(chart_data):
+    if not chart_data:
+        return
+
+    try:
+        chart_type = chart_data.get("type")
+        title = chart_data.get("title")
+        x_label = chart_data.get("x_label")
+        y_label = chart_data.get("y_label")
+        data = chart_data.get("data", [])
+
+        labels = [item["label"] for item in data]
+        values = [item["value"] for item in data]
+
+        fig = go.Figure()
+
+        if chart_type == "bar":
+            fig.add_trace(go.Bar(x=labels, y=values))
+        elif chart_type == "line":
+            fig.add_trace(go.Scatter(x=labels, y=values, mode='lines+markers'))
+
+        fig.update_layout(
+            title=title,
+            xaxis_title=x_label,
+            yaxis_title=y_label
+        )
+
+        st.plotly_chart(fig)
+    except Exception as e:
+        st.error(f"Error rendering chart: {e}")
 
 def main():
     st.set_page_config(page_title="Finans-AI", page_icon="💰")
@@ -79,6 +113,8 @@ def main():
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
+            if "chart_data" in message:
+                render_chart(message["chart_data"])
             if "sources" in message:
                 with st.expander("Visa källor"):
                     for source in message["sources"]:
@@ -97,7 +133,23 @@ def main():
                     try:
                         response = st.session_state.chain.invoke({"input": prompt})
                         answer = response['answer']
+
+                        # Extract JSON
+                        chart_data = None
+                        json_match = re.search(r'```json\s*(\{.*?\})\s*```', answer, re.DOTALL)
+                        if json_match:
+                            json_str = json_match.group(1)
+                            try:
+                                chart_data = json.loads(json_str)
+                                # Remove the JSON block from the answer
+                                answer = answer.replace(json_match.group(0), "").strip()
+                            except json.JSONDecodeError:
+                                pass
+
                         st.markdown(answer)
+
+                        if chart_data:
+                            render_chart(chart_data)
 
                         # Process sources
                         sources_text = []
@@ -118,7 +170,8 @@ def main():
                         st.session_state.messages.append({
                             "role": "assistant",
                             "content": answer,
-                            "sources": sources_text
+                            "sources": sources_text,
+                            "chart_data": chart_data
                         })
                     except Exception as e:
                         st.error(f"Error generating response: {e}")

@@ -37,10 +37,16 @@ def load_pdfs(directory):
 
 def split_text(documents):
     """
-    Splits the documents into chunks.
+    Splits the documents into chunks and embeds page numbers.
     """
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunks = text_splitter.split_documents(documents)
+
+    # Embed page number into the content of each chunk
+    for chunk in chunks:
+        page_num = chunk.metadata.get('page', -1) + 1  # Assuming 0-indexed pages
+        chunk.page_content = f"[Page {page_num}] {chunk.page_content}"
+
     return chunks
 
 def create_vector_store(chunks):
@@ -73,6 +79,7 @@ def get_conversational_chain(vector_store):
         "If the user asks for a summary, provide a concise and factual financial summary based on the context. "
         "If the user asks about the sentiment, assess the overall tone (e.g., positive, negative, neutral, cautious) based on the context and explain your reasoning. "
         "When answering, you MUST cite the source page number for every fact you mention. "
+        "The text chunks provided contain page numbers in the format '[Page X]'. Use these tags to ensure your citations are accurate. "
         "Format citations as [Page X]. Example: 'Revenue increased by 10% [Page 3]'. "
         "If the answer is not in the context, say that you don't know. "
         "Keep the answer concise."

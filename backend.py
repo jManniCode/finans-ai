@@ -57,7 +57,7 @@ def create_vector_store(chunks):
     # but explicitly 'models/embedding-001' is a safe bet for compatibility.
     # The user asked to use the default, so we'll instantiate it without arguments
     # or with the standard one if needed.
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+    embeddings = GoogleGenerativeAIEmbeddings()
 
     # Create vector store in memory
     vector_store = Chroma.from_documents(chunks, embeddings)

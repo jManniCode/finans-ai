@@ -1,7 +1,9 @@
 langchain
+langchain-community
+langchain-text-splitters
 langchain-google-genai
 streamlit
 pypdf
 plotly
 python-dotenv
-chromadb  
+chromadb

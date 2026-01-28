@@ -49,15 +49,32 @@ def split_text(documents):
 
     return chunks
 
+def get_valid_embeddings():
+    """
+    Attempts to find a working embedding model by testing available options.
+    """
+    candidate_models = ["models/text-embedding-004", "models/embedding-001"]
+
+    for model_name in candidate_models:
+        try:
+            embeddings = GoogleGenerativeAIEmbeddings(model=model_name)
+            # Test the embeddings
+            embeddings.embed_query("test")
+            print(f"Successfully selected embedding model: {model_name}")
+            return embeddings
+        except Exception as e:
+            print(f"Failed to initialize model {model_name}: {e}")
+            continue
+
+    # Fallback to default if everything fails (or let it crash with a clear error)
+    print("Could not verify any specific model, falling back to 'models/embedding-001'")
+    return GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+
 def create_vector_store(chunks):
     """
     Creates a Chroma vector store from the document chunks.
     """
-    # Using the default model for GoogleGenerativeAIEmbeddings if not specified,
-    # but explicitly 'models/embedding-001' is a safe bet for compatibility.
-    # The user asked to use the default, so we'll instantiate it without arguments
-    # or with the standard one if needed.
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    embeddings = get_valid_embeddings()
 
     # Create vector store in memory
     vector_store = Chroma.from_documents(chunks, embeddings)

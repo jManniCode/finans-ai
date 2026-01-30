@@ -103,13 +103,31 @@ def main():
                         vector_store = backend.create_vector_store(chunks)
                         chain = backend.get_conversational_chain(vector_store)
 
-                        # Store chain in session state
+                        # Store chain and vector_store in session state
                         st.session_state.chain = chain
+                        st.session_state.vector_store = vector_store
                         # Clear chat history to start fresh
                         st.session_state.messages = []
                         st.success("Documents processed successfully! You can now ask questions.")
             except Exception as e:
                 st.error(f"An error occurred during processing: {e}")
+
+    # Debug Interface
+    if "vector_store" in st.session_state:
+        with st.sidebar.expander("🔍 Debug: Visa databas"):
+            if st.button("Hämta data från Chroma"):
+                try:
+                    stored_docs = backend.get_all_documents(st.session_state.vector_store)
+                    st.write(f"Antal chunkar i databasen: {len(stored_docs)}")
+                    for i, doc in enumerate(stored_docs[:5]): # Show first 5 chunks
+                        st.markdown(f"**Chunk {i+1}** (ID: {doc['id']})")
+                        st.caption(f"Metadata: {doc['metadata']}")
+                        st.text(doc['content'][:200] + "...") # Show first 200 chars
+                        st.divider()
+                    if len(stored_docs) > 5:
+                        st.info(f"...och {len(stored_docs) - 5} till.")
+                except Exception as e:
+                    st.error(f"Kunde inte hämta data: {e}")
 
     # Chat Interface
     for message in st.session_state.messages:

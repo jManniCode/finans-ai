@@ -134,3 +134,24 @@ def get_conversational_chain(vector_store):
     rag_chain = create_retrieval_chain(retriever, question_answer_chain)
 
     return rag_chain
+
+def get_all_documents(vector_store):
+    """
+    Retrieves all documents stored in the Chroma vector store.
+    """
+    # Chroma's get() method without arguments returns all data
+    data = vector_store.get()
+
+    documents = []
+    # Combine the separate lists (ids, metadatas, documents) into a list of dicts
+    if data and "ids" in data:
+        for i, doc_id in enumerate(data["ids"]):
+            doc_content = data["documents"][i] if data["documents"] else ""
+            metadata = data["metadatas"][i] if data["metadatas"] else {}
+            documents.append({
+                "id": doc_id,
+                "content": doc_content,
+                "metadata": metadata
+            })
+
+    return documents

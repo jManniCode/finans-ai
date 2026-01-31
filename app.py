@@ -189,8 +189,11 @@ def main():
                         # Process sources
                         sources_text = []
                         if "context" in response:
+                            # Sort documents by page number for user-friendly display
+                            sorted_docs = sorted(response["context"], key=lambda x: x.metadata.get('page', 0))
+
                             # Display all retrieved sources so the user can verify all citations
-                            for doc in response["context"]:
+                            for doc in sorted_docs:
                                 # Add 1 to page number for user-friendly display (assuming 0-indexed)
                                 page = doc.metadata.get('page', -1) + 1
                                 # Show full content to allow verifying numbers

@@ -59,6 +59,12 @@ def render_chart(chart_data):
     except Exception as e:
         st.error(f"Error rendering chart: {e}")
 
+@st.dialog("Källor")
+def show_sources(sources):
+    for source in sources:
+        st.markdown(source)
+        st.divider()
+
 def main():
     st.set_page_config(page_title="Finans-AI", page_icon="💰")
     st.title("💰 Finans-AI: Financial Report Analyzer")
@@ -130,7 +136,7 @@ def main():
                     st.error(f"Kunde inte hämta data: {e}")
 
     # Chat Interface
-    for message in st.session_state.messages:
+    for i, message in enumerate(st.session_state.messages):
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
             if "chart_data" in message:
@@ -142,9 +148,8 @@ def main():
                 else:
                     render_chart(data)
             if "sources" in message:
-                with st.expander("Visa källor"):
-                    for source in message["sources"]:
-                        st.markdown(source)
+                if st.button("Visa källor", key=f"sources_btn_{i}"):
+                    show_sources(message["sources"])
 
     if prompt := st.chat_input("Ask a question about the financial reports"):
         # Display user message
@@ -192,17 +197,20 @@ def main():
                                 source_info = f"**Sida {page}:**\n{doc.page_content}"
                                 sources_text.append(source_info)
 
-                        if sources_text:
-                            with st.expander("Visa källor"):
-                                for source in sources_text:
-                                    st.markdown(source)
-
+                        # Append message first so we have the index for the key
                         st.session_state.messages.append({
                             "role": "assistant",
                             "content": answer,
                             "sources": sources_text,
                             "chart_data": chart_data_list
                         })
+
+                        # Show button for the new message
+                        if sources_text:
+                            # Use a unique key based on the length of messages (which is the index of this new message)
+                            if st.button("Visa källor", key=f"sources_btn_{len(st.session_state.messages)-1}"):
+                                show_sources(sources_text)
+
                     except Exception as e:
                         st.error(f"Error generating response: {e}")
         else:

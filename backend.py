@@ -45,10 +45,19 @@ def split_text(documents):
 
     return chunks
 
+# Global variable to cache the working model name
+_valid_model_name = None
+
 def get_valid_embeddings():
     """
     Attempts to find a working embedding model by testing available options.
     """
+    global _valid_model_name
+
+    # If we already found a valid model, use it directly to avoid redundant network checks
+    if _valid_model_name:
+        return GoogleGenerativeAIEmbeddings(model=_valid_model_name)
+
     candidate_models = ["models/text-embedding-004", "models/embedding-001"]
 
     for model_name in candidate_models:
@@ -57,6 +66,7 @@ def get_valid_embeddings():
             # Test the embeddings
             embeddings.embed_query("test")
             print(f"Successfully selected embedding model: {model_name}")
+            _valid_model_name = model_name
             return embeddings
         except Exception as e:
             print(f"Failed to initialize model {model_name}: {e}")

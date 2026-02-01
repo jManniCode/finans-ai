@@ -61,7 +61,15 @@ def render_chart(chart_data):
 
 @st.dialog("Källor")
 def show_sources(sources):
-    for source in sources:
+    # Sort sources by page number using regex to extract "Sida X"
+    # This handles both new and existing history
+    def get_page_num(text):
+        match = re.search(r"Sida (\d+):", text)
+        return int(match.group(1)) if match else 0
+
+    sorted_sources = sorted(sources, key=get_page_num)
+
+    for source in sorted_sources:
         st.markdown(source)
         st.divider()
 

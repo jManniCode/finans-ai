@@ -6,6 +6,7 @@ import json
 import re
 import time
 import datetime
+import uuid
 import plotly.graph_objects as go
 from dotenv import load_dotenv
 
@@ -16,7 +17,8 @@ import backend
 
 # Constants
 TEMP_PDF_DIR = "temp_pdf"
-CHROMA_DB_DIR = "chroma_db"
+CHROMA_DATA_ROOT = "chroma_data"
+ACTIVE_DB_FILE = "active_db.txt"
 
 @st.cache_resource
 def get_embeddings():
@@ -60,47 +62,43 @@ def show_sources(sources):
         st.markdown(source)
         st.divider()
 
-def cleanup_data_directory(directory_path):
+def get_active_db_path():
+    if os.path.exists(ACTIVE_DB_FILE):
+        with open(ACTIVE_DB_FILE, "r") as f:
+            path = f.read().strip()
+            if os.path.exists(path):
+                return path
+    return None
+
+def set_active_db_path(path):
+    with open(ACTIVE_DB_FILE, "w") as f:
+        f.write(path)
+
+def cleanup_old_sessions():
     """
-    Attempts to remove the directory. If blocked, retries or renames.
+    Attempts to clean up old database directories.
+    Catches PermissionError to ignore locked folders (active sessions).
     """
-    if not os.path.exists(directory_path):
+    if not os.path.exists(CHROMA_DATA_ROOT):
         return
 
-    # Attempt to free resources first
-    if "vector_store" in st.session_state:
-        del st.session_state.vector_store
-    if "chain" in st.session_state:
-        del st.session_state.chain
+    active_path = get_active_db_path()
 
-    # Force garbage collection
-    import gc
-    gc.collect()
+    for item in os.listdir(CHROMA_DATA_ROOT):
+        item_path = os.path.join(CHROMA_DATA_ROOT, item)
+        if os.path.isdir(item_path):
+            # Skip the currently active one if known
+            if active_path and os.path.abspath(item_path) == os.path.abspath(active_path):
+                continue
 
-    # Retry loop
-    max_retries = 3
-    for i in range(max_retries):
-        try:
-            shutil.rmtree(directory_path)
-            return # Success
-        except PermissionError:
-            time.sleep(0.5) # Wait a bit
-            pass # Retry
-        except Exception as e:
-            st.error(f"Error deleting database: {e}")
-            return
-
-    # If we are here, retries failed. Try to rename to "trash"
-    try:
-        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-        trash_path = f"{directory_path}_trash_{timestamp}"
-        os.rename(directory_path, trash_path)
-        # We don't delete trash_path now, we leave it for the OS or future cleanup
-        # st.warning(f"Database was locked. Moved to {trash_path} instead of deleting.")
-    except Exception as e:
-        # If even rename fails, we are stuck
-        st.error(f"Could not reset database due to file lock: {e}. Please restart the application.")
-        st.stop()
+            try:
+                shutil.rmtree(item_path)
+                # print(f"Cleaned up old session: {item}")
+            except PermissionError:
+                # Expected for locked/zombie folders on Windows
+                pass
+            except Exception as e:
+                print(f"Error cleaning up {item}: {e}")
 
 def main():
     st.set_page_config(page_title="Finans-AI", page_icon="💰")
@@ -111,16 +109,23 @@ def main():
         st.session_state.messages = []
 
     # Check for existing database on startup
-    if "vector_store" not in st.session_state and os.path.exists(CHROMA_DB_DIR):
-        try:
-            embeddings = get_embeddings()
-            vector_store = backend.load_vector_store(CHROMA_DB_DIR, embeddings)
-            if vector_store:
-                st.session_state.vector_store = vector_store
-                st.session_state.chain = backend.get_conversational_chain(vector_store)
-                st.toast("Loaded existing database from disk.", icon="💾")
-        except Exception as e:
-            st.error(f"Failed to load existing database: {e}")
+    if "vector_store" not in st.session_state:
+        active_db_path = get_active_db_path()
+        if active_db_path:
+            try:
+                embeddings = get_embeddings()
+                vector_store = backend.load_vector_store(active_db_path, embeddings)
+                if vector_store:
+                    st.session_state.vector_store = vector_store
+                    st.session_state.chain = backend.get_conversational_chain(vector_store)
+                    st.toast("Loaded existing database from disk.", icon="💾")
+            except Exception as e:
+                st.error(f"Failed to load existing database: {e}")
+
+    # Lazy cleanup on startup
+    if "cleanup_done" not in st.session_state:
+        cleanup_old_sessions()
+        st.session_state.cleanup_done = True
 
     # Sidebar
     with st.sidebar:
@@ -131,13 +136,16 @@ def main():
 
     # Processing Logic
     if process_button and uploaded_files:
-        # 1. Clear/Create temp directory and chroma db
+        # 1. Clear/Create temp directory
         if os.path.exists(TEMP_PDF_DIR):
             shutil.rmtree(TEMP_PDF_DIR)
         os.makedirs(TEMP_PDF_DIR)
 
-        if os.path.exists(CHROMA_DB_DIR):
-            cleanup_data_directory(CHROMA_DB_DIR)
+        # Create a UNIQUE directory for this run to avoid file locks on Windows
+        if not os.path.exists(CHROMA_DATA_ROOT):
+            os.makedirs(CHROMA_DATA_ROOT)
+
+        new_db_path = os.path.join(CHROMA_DATA_ROOT, f"session_{uuid.uuid4()}")
 
         # 2. Save files
         with st.spinner("Saving uploaded files..."):
@@ -159,8 +167,11 @@ def main():
                     else:
                         chunks = backend.split_text(documents)
                         embeddings = get_embeddings()
-                        vector_store = backend.create_vector_store(chunks, embeddings=embeddings, persist_directory=CHROMA_DB_DIR)
+                        vector_store = backend.create_vector_store(chunks, embeddings=embeddings, persist_directory=new_db_path)
                         chain = backend.get_conversational_chain(vector_store)
+
+                        # Update active pointer
+                        set_active_db_path(new_db_path)
 
                         # Store chain and vector_store in session state
                         st.session_state.chain = chain

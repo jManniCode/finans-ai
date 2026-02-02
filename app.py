@@ -10,21 +10,15 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Try to import backend, handling missing dependencies gracefully
-try:
-    import backend
-except ImportError as e:
-    # Check specifically for langchain_community or other likely missing packages
-    if "langchain_community" in str(e):
-        st.error("Missing dependency: `langchain-community`.")
-        st.error("Please run: `pip install -r requirements.txt` to install all required packages.")
-        st.stop()
-    else:
-        # Re-raise other ImportErrors to avoid hiding legitimate bugs
-        raise e
+import backend
 
 # Constants
 TEMP_PDF_DIR = "temp_pdf"
+CHROMA_DB_DIR = "chroma_db"
+
+@st.cache_resource
+def get_embeddings():
+    return backend.get_valid_embeddings()
 
 def render_chart(chart_data):
     if not chart_data:
@@ -45,15 +39,14 @@ def render_chart(chart_data):
 
         if chart_type == "bar":
             fig.add_trace(go.Bar(x=labels, y=values))
+            fig.update_layout(xaxis=dict(type='category'), xaxis_title=x_label, yaxis_title=y_label)
         elif chart_type == "line":
             fig.add_trace(go.Scatter(x=labels, y=values, mode='lines+markers'))
+            fig.update_layout(xaxis=dict(type='category'), xaxis_title=x_label, yaxis_title=y_label)
+        elif chart_type == "pie":
+            fig.add_trace(go.Pie(labels=labels, values=values))
 
-        fig.update_layout(
-            title=title,
-            xaxis_title=x_label,
-            yaxis_title=y_label,
-            xaxis=dict(type='category') # Force categorical axis to avoid decimal years
-        )
+        fig.update_layout(title=title)
 
         st.plotly_chart(fig)
     except Exception as e:
@@ -82,10 +75,13 @@ def main():
 
     # Processing Logic
     if process_button and uploaded_files:
-        # 1. Clear/Create temp directory
+        # 1. Clear/Create temp directory and chroma db
         if os.path.exists(TEMP_PDF_DIR):
             shutil.rmtree(TEMP_PDF_DIR)
         os.makedirs(TEMP_PDF_DIR)
+
+        if os.path.exists(CHROMA_DB_DIR):
+            shutil.rmtree(CHROMA_DB_DIR)
 
         # 2. Save files
         with st.spinner("Saving uploaded files..."):
@@ -106,7 +102,8 @@ def main():
                         st.warning("No text could be extracted from the PDFs.")
                     else:
                         chunks = backend.split_text(documents)
-                        vector_store = backend.create_vector_store(chunks)
+                        embeddings = get_embeddings()
+                        vector_store = backend.create_vector_store(chunks, embeddings=embeddings, persist_directory=CHROMA_DB_DIR)
                         chain = backend.get_conversational_chain(vector_store)
 
                         # Store chain and vector_store in session state

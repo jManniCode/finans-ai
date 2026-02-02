@@ -76,14 +76,19 @@ def get_valid_embeddings():
     print("Could not verify any specific model, falling back to 'models/embedding-001'")
     return GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
-def create_vector_store(chunks):
+def create_vector_store(chunks, embeddings=None, persist_directory=None):
     """
     Creates a Chroma vector store from the document chunks.
     """
-    embeddings = get_valid_embeddings()
+    if embeddings is None:
+        embeddings = get_valid_embeddings()
 
-    # Create vector store in memory
-    vector_store = Chroma.from_documents(chunks, embeddings)
+    # Create vector store
+    if persist_directory:
+        vector_store = Chroma.from_documents(chunks, embeddings, persist_directory=persist_directory)
+    else:
+        vector_store = Chroma.from_documents(chunks, embeddings)
+
     return vector_store
 
 def get_conversational_chain(vector_store):
@@ -107,13 +112,14 @@ def get_conversational_chain(vector_store):
         "If the answer is not in the context, say that you don't know. "
         "Keep the answer concise."
         "\n\n"
-        "If the answer includes financial figures suitable for a visualization (e.g., trends over years, or comparisons between periods like Q3 2024 vs Q3 2025), "
+        "If the answer includes financial figures suitable for a visualization (e.g., trends over years, or comparisons between periods like Q3 2024 vs Q3 2025, or distribution/proportions), "
         "or if the user explicitly asks for a graph, you MUST generate a JSON object representing this data at the very end of your response. "
+        "Use 'bar' for comparisons, 'line' for trends, and 'pie' for proportions/distributions. "
         "Even for simple comparisons (e.g., This Year vs Last Year), generate a bar chart. "
         "The JSON must be enclosed in triple backticks with 'json' identifier, like this:\n"
         "```json\n"
         "{{\n"
-        "    \"type\": \"bar\" or \"line\",\n"
+        "    \"type\": \"bar\" or \"line\" or \"pie\",\n"
         "    \"title\": \"Chart Title\",\n"
         "    \"x_label\": \"X Axis Label\",\n"
         "    \"y_label\": \"Y Axis Label\",\n"

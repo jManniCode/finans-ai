@@ -91,6 +91,20 @@ def create_vector_store(chunks, embeddings=None, persist_directory=None):
 
     return vector_store
 
+def load_vector_store(persist_directory, embeddings=None):
+    """
+    Loads an existing Chroma vector store from the specified directory.
+    """
+    if embeddings is None:
+        embeddings = get_valid_embeddings()
+
+    if os.path.exists(persist_directory):
+        vector_store = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
+        return vector_store
+    else:
+        print(f"Directory {persist_directory} does not exist.")
+        return None
+
 def get_conversational_chain(vector_store):
     """
     Creates a conversational chain using the vector store.

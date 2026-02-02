@@ -66,6 +66,18 @@ def main():
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
+    # Check for existing database on startup
+    if "vector_store" not in st.session_state and os.path.exists(CHROMA_DB_DIR):
+        try:
+            embeddings = get_embeddings()
+            vector_store = backend.load_vector_store(CHROMA_DB_DIR, embeddings)
+            if vector_store:
+                st.session_state.vector_store = vector_store
+                st.session_state.chain = backend.get_conversational_chain(vector_store)
+                st.toast("Loaded existing database from disk.", icon="💾")
+        except Exception as e:
+            st.error(f"Failed to load existing database: {e}")
+
     # Sidebar
     with st.sidebar:
         st.header("Upload Reports")

@@ -4,6 +4,8 @@ import shutil
 import sys
 import json
 import re
+import time
+import datetime
 import plotly.graph_objects as go
 from dotenv import load_dotenv
 
@@ -58,6 +60,48 @@ def show_sources(sources):
         st.markdown(source)
         st.divider()
 
+def cleanup_data_directory(directory_path):
+    """
+    Attempts to remove the directory. If blocked, retries or renames.
+    """
+    if not os.path.exists(directory_path):
+        return
+
+    # Attempt to free resources first
+    if "vector_store" in st.session_state:
+        del st.session_state.vector_store
+    if "chain" in st.session_state:
+        del st.session_state.chain
+
+    # Force garbage collection
+    import gc
+    gc.collect()
+
+    # Retry loop
+    max_retries = 3
+    for i in range(max_retries):
+        try:
+            shutil.rmtree(directory_path)
+            return # Success
+        except PermissionError:
+            time.sleep(0.5) # Wait a bit
+            pass # Retry
+        except Exception as e:
+            st.error(f"Error deleting database: {e}")
+            return
+
+    # If we are here, retries failed. Try to rename to "trash"
+    try:
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        trash_path = f"{directory_path}_trash_{timestamp}"
+        os.rename(directory_path, trash_path)
+        # We don't delete trash_path now, we leave it for the OS or future cleanup
+        # st.warning(f"Database was locked. Moved to {trash_path} instead of deleting.")
+    except Exception as e:
+        # If even rename fails, we are stuck
+        st.error(f"Could not reset database due to file lock: {e}. Please restart the application.")
+        st.stop()
+
 def main():
     st.set_page_config(page_title="Finans-AI", page_icon="💰")
     st.title("💰 Finans-AI: Financial Report Analyzer")
@@ -93,18 +137,7 @@ def main():
         os.makedirs(TEMP_PDF_DIR)
 
         if os.path.exists(CHROMA_DB_DIR):
-            # Attempt to free resources before deletion (Windows fix)
-            if "vector_store" in st.session_state:
-                del st.session_state.vector_store
-                del st.session_state.chain
-                import gc
-                gc.collect()
-
-            try:
-                shutil.rmtree(CHROMA_DB_DIR)
-            except PermissionError:
-                st.error("Could not delete existing database due to file lock. Please restart the application.")
-                st.stop()
+            cleanup_data_directory(CHROMA_DB_DIR)
 
         # 2. Save files
         with st.spinner("Saving uploaded files..."):

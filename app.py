@@ -93,7 +93,18 @@ def main():
         os.makedirs(TEMP_PDF_DIR)
 
         if os.path.exists(CHROMA_DB_DIR):
-            shutil.rmtree(CHROMA_DB_DIR)
+            # Attempt to free resources before deletion (Windows fix)
+            if "vector_store" in st.session_state:
+                del st.session_state.vector_store
+                del st.session_state.chain
+                import gc
+                gc.collect()
+
+            try:
+                shutil.rmtree(CHROMA_DB_DIR)
+            except PermissionError:
+                st.error("Could not delete existing database due to file lock. Please restart the application.")
+                st.stop()
 
         # 2. Save files
         with st.spinner("Saving uploaded files..."):

@@ -387,23 +387,25 @@ def main():
     # Check for existing database on startup (only if no session is active)
     if "vector_store" not in st.session_state:
         active_db_path = get_active_db_path()
+
+        # NOTE: logic adjusted here: Only load active DB if we are NOT explicitly in "New Analysis" mode.
+        # But "New Analysis" mode is state=None.
+        # The problem is that rerun() re-reads this.
+        # We need to rely on the fact that if we just clicked "New Analysis", we should probably CLEAR the active_db file.
+
         if active_db_path:
             try:
                 embeddings = get_embeddings()
                 vector_store = backend.load_vector_store(active_db_path, embeddings)
                 if vector_store:
-                    st.session_state.vector_store = vector_store
-                    st.session_state.chain = backend.get_conversational_chain(vector_store)
                     # Try to match the active DB with a session ID
-                    # This is best effort. If not found, user can start new or load old.
-                    # But ideally we shouldn't auto-load the "Last" if we want a clean state.
-                    # However, to preserve "Reload" functionality (F5), we keep this.
-                    # But we need to know WHICH session ID it corresponds to.
-
                     history = chat_manager.load_chat_history()
                     found_session = False
                     for sid, data in history.items():
                         if data.get("db_path") and os.path.abspath(data["db_path"]) == os.path.abspath(active_db_path):
+                            # Only restore if we actually found a valid session
+                            st.session_state.vector_store = vector_store
+                            st.session_state.chain = backend.get_conversational_chain(vector_store)
                             st.session_state.current_session_id = sid
                             st.session_state.messages = data.get("messages", [])
                             st.session_state.initial_charts = data.get("initial_charts", [])
@@ -435,6 +437,11 @@ def main():
              for key in ["vector_store", "chain", "messages", "initial_charts", "current_session_id"]:
                 if key in st.session_state:
                     del st.session_state[key]
+
+             # ALSO clear the active DB file so we don't reload it on rerun
+             if os.path.exists(ACTIVE_DB_FILE):
+                 os.remove(ACTIVE_DB_FILE)
+
              st.rerun()
 
         st.subheader("Historik")

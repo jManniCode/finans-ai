@@ -280,8 +280,34 @@ def render_active_session_view(layout_mode):
     with chart_container:
         st.subheader("Finansiell Översikt")
         if "initial_charts" in st.session_state and st.session_state.initial_charts:
-            for chart in st.session_state.initial_charts:
-                render_chart(chart)
+            # Create a selection of charts
+            chart_titles = [c.get("title", f"Chart {i+1}") for i, c in enumerate(st.session_state.initial_charts)]
+
+            # Use columns as buttons for "knappval" feel
+            cols = st.columns(len(chart_titles))
+
+            # State to track active chart
+            if "active_chart_index" not in st.session_state:
+                st.session_state.active_chart_index = None
+
+            # Render buttons
+            for i, title in enumerate(chart_titles):
+                with cols[i]:
+                    if st.button(title, key=f"chart_btn_{i}", use_container_width=True):
+                        st.session_state.active_chart_index = i
+
+            # Render selected chart
+            if st.session_state.active_chart_index is not None:
+                st.markdown("---")
+                render_chart(st.session_state.initial_charts[st.session_state.active_chart_index])
+
+                # Close button
+                if st.button("Dölj graf", key="close_chart"):
+                    st.session_state.active_chart_index = None
+                    st.rerun()
+            else:
+                 st.caption("Välj en kategori ovan för att visualisera data.")
+
         elif "chain" in st.session_state:
              st.info("No automatic charts could be generated from the provided documents. Try asking for specific data in the chat.")
         else:

@@ -58,7 +58,7 @@ def render_chart(chart_data):
 
         fig.update_layout(title=title)
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig)
     except Exception as e:
         st.error(f"Error rendering chart: {e}")
 
@@ -432,7 +432,7 @@ def main():
         st.title("💰 Finans-AI")
 
         # New Chat Button
-        if st.button("➕ Ny Analys", type="primary", use_container_width=True):
+        if st.button("➕ Ny Analys", type="primary", width="stretch"):
              # Clear session state keys to reset view
              for key in ["vector_store", "chain", "messages", "initial_charts", "current_session_id"]:
                 if key in st.session_state:
@@ -457,7 +457,7 @@ def main():
             if sid == st.session_state.current_session_id:
                 button_label = f"📂 {button_label}" # Indicate active
 
-            if st.button(button_label, key=sid, use_container_width=True):
+            if st.button(button_label, key=sid, width="stretch"):
                  if st.session_state.current_session_id != sid:
                      load_session(sid)
                      st.rerun()
@@ -473,7 +473,7 @@ def main():
         )
 
         if st.session_state.current_session_id:
-             if st.button("🗑️ Ta bort denna chatt", use_container_width=True):
+             if st.button("🗑️ Ta bort denna chatt", width="stretch"):
                  chat_manager.delete_chat_session(st.session_state.current_session_id)
                  clear_current_session() # Effectively resets view
 

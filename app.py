@@ -14,6 +14,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import backend
+import chat_manager
+
 try:
     import pandas as pd
 except ImportError:
@@ -88,11 +90,24 @@ def cleanup_old_sessions():
 
     active_path = get_active_db_path()
 
+    # Get all DB paths referenced in chat history
+    history = chat_manager.load_chat_history()
+    saved_db_paths = set()
+    for session in history.values():
+        if "db_path" in session:
+            saved_db_paths.add(os.path.abspath(session["db_path"]))
+
     for item in os.listdir(CHROMA_DATA_ROOT):
         item_path = os.path.join(CHROMA_DATA_ROOT, item)
         if os.path.isdir(item_path):
-            # Skip the currently active one if known
-            if active_path and os.path.abspath(item_path) == os.path.abspath(active_path):
+            abs_item_path = os.path.abspath(item_path)
+
+            # Skip if it is the currently active one
+            if active_path and abs_item_path == os.path.abspath(active_path):
+                continue
+
+            # Skip if it is referenced in a saved chat
+            if abs_item_path in saved_db_paths:
                 continue
 
             try:
@@ -103,6 +118,58 @@ def cleanup_old_sessions():
                 pass
             except Exception as e:
                 print(f"Error cleaning up {item}: {e}")
+
+def clear_current_session():
+    """
+    Clears the current session state and attempts to delete the active database.
+    """
+    active_path = get_active_db_path()
+    if active_path and os.path.exists(active_path):
+        try:
+            # We can only delete it if we release the handle.
+            # In Streamlit, this is tricky because the vector store might still be in memory.
+            # We'll rely on the 'cleanup_old_sessions' on next restart for full deletion,
+            # but we can at least clear the pointer file and session state.
+            if os.path.exists(ACTIVE_DB_FILE):
+                os.remove(ACTIVE_DB_FILE)
+
+            # Clear session state keys
+            for key in ["vector_store", "chain", "messages", "initial_charts", "current_session_id"]:
+                if key in st.session_state:
+                    del st.session_state[key]
+
+            st.success("Session cleared! Reloading...")
+            time.sleep(1)
+            st.rerun()
+
+        except Exception as e:
+            st.error(f"Error clearing session: {e}")
+
+def load_session(session_id):
+    """Loads a specific chat session."""
+    session_data = chat_manager.get_chat_session(session_id)
+    if not session_data:
+        st.error("Session not found.")
+        return
+
+    db_path = session_data.get("db_path")
+    if not db_path or not os.path.exists(db_path):
+        st.error("Database for this session no longer exists.")
+        return
+
+    try:
+        embeddings = get_embeddings()
+        vector_store = backend.load_vector_store(db_path, embeddings)
+        if vector_store:
+            st.session_state.vector_store = vector_store
+            st.session_state.chain = backend.get_conversational_chain(vector_store)
+            st.session_state.messages = session_data.get("messages", [])
+            st.session_state.initial_charts = session_data.get("initial_charts", [])
+            st.session_state.current_session_id = session_id
+            set_active_db_path(db_path)
+            st.toast(f"Loaded chat: {session_data.get('title')}", icon="📂")
+    except Exception as e:
+        st.error(f"Failed to load session: {e}")
 
 def main():
     st.set_page_config(page_title="Finans-AI", page_icon="💰", layout="wide")
@@ -116,7 +183,10 @@ def main():
     if "initial_charts" not in st.session_state:
         st.session_state.initial_charts = []
 
-    # Check for existing database on startup
+    if "current_session_id" not in st.session_state:
+        st.session_state.current_session_id = None
+
+    # Check for existing database on startup (only if no session is active)
     if "vector_store" not in st.session_state:
         active_db_path = get_active_db_path()
         if active_db_path:
@@ -146,10 +216,68 @@ def main():
             index=0
         )
 
+        st.divider()
+        st.header("Sparade Chattar")
+
+        # Saved Chats List
+        history = chat_manager.load_chat_history()
+        # Sort by date descending
+        sorted_sessions = sorted(history.items(), key=lambda x: x[1].get("created_at", ""), reverse=True)
+
+        session_options = {sid: data["title"] for sid, data in sorted_sessions}
+
+        # Determine correct index for selectbox
+        options_list = ["new_session"] + list(session_options.keys())
+        default_index = 0
+
+        if st.session_state.current_session_id in session_options:
+            try:
+                # +1 because "new_session" is at index 0
+                default_index = list(session_options.keys()).index(st.session_state.current_session_id) + 1
+            except ValueError:
+                default_index = 0
+
+        # Add "New Chat" option
+        selected_session_id = st.selectbox(
+            "Välj chatt",
+            options=options_list,
+            index=default_index,
+            format_func=lambda x: "➕ Ny Analys" if x == "new_session" else session_options.get(x, "Okänd")
+        )
+
+        # Handle Session Switching
+        if selected_session_id != "new_session":
+            if st.session_state.current_session_id != selected_session_id:
+                load_session(selected_session_id)
+                st.rerun()
+        elif selected_session_id == "new_session" and st.session_state.current_session_id is not None:
+             # User selected "New Analys" but we are currently in a session.
+             # We should essentially "clear" the view to allow upload, but not delete data.
+             # Just clearing the state keys related to the current session view.
+             for key in ["vector_store", "chain", "messages", "initial_charts", "current_session_id"]:
+                if key in st.session_state:
+                    del st.session_state[key]
+             st.rerun()
+
+        if st.session_state.current_session_id:
+             if st.button("🗑️ Ta bort denna chatt"):
+                 chat_manager.delete_chat_session(st.session_state.current_session_id)
+                 clear_current_session() # Effectively resets view
+
+        st.divider()
         st.header("Upload Reports")
+
+        # Session Name Input (Only relevant for new sessions)
+        session_name = st.text_input("Namn på analys (valfritt)", placeholder="T.ex. Apple Q3 2024")
+
         uploaded_files = st.file_uploader("Upload PDF files", type="pdf", accept_multiple_files=True)
 
         process_button = st.button("Process Documents")
+
+        st.divider()
+        with st.expander("🛠️ Debug & Tools"):
+            if st.button("🗑️ Rensa databas", type="primary"):
+                clear_current_session()
 
     # Processing Logic
     if process_button and uploaded_files:
@@ -193,7 +321,6 @@ def main():
                         # Store chain and vector_store in session state
                         st.session_state.chain = chain
                         st.session_state.vector_store = vector_store
-                        # Clear chat history to start fresh
                         st.session_state.messages = []
 
                         # Generate Summary Charts
@@ -201,7 +328,23 @@ def main():
                         initial_charts = backend.generate_summary_charts(chain)
                         st.session_state.initial_charts = initial_charts
 
+                        # Create Persistent Session
+                        if not session_name:
+                            session_name = uploaded_files[0].name
+
+                        new_session_id = chat_manager.create_chat_session(session_name, new_db_path)
+                        st.session_state.current_session_id = new_session_id
+
+                        # Save initial state
+                        chat_manager.update_chat_session(
+                            new_session_id,
+                            messages=[],
+                            initial_charts=initial_charts
+                        )
+
                         st.success("Documents processed successfully! You can now ask questions.")
+                        time.sleep(1) # Brief pause so user sees success message
+                        st.rerun() # Rerun to update sidebar list
             except Exception as e:
                 st.error(f"An error occurred during processing: {e}")
 
@@ -341,6 +484,13 @@ def main():
                                 "sources": sources_text,
                                 "chart_data": chart_data_list
                             })
+
+                            # Save Chat History if session is active
+                            if st.session_state.current_session_id:
+                                chat_manager.update_chat_session(
+                                    st.session_state.current_session_id,
+                                    messages=st.session_state.messages
+                                )
 
                             # Show button for the new message
                             if sources_text:

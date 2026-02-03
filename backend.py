@@ -42,6 +42,12 @@ def split_text(documents):
     for chunk in chunks:
         page_num = chunk.metadata.get('page', -1) + 1  # Assuming 0-indexed pages
         chunk.page_content = f"[Page {page_num}] {chunk.page_content}"
+        # Ensure 'source' is in metadata, defaulting to 'unknown' if missing
+        if 'source' not in chunk.metadata:
+            chunk.metadata['source'] = 'unknown'
+        # Clean up source path to just filename for cleaner display
+        else:
+             chunk.metadata['source'] = os.path.basename(chunk.metadata['source'])
 
     return chunks
 

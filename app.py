@@ -14,6 +14,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import backend
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
 
 # Constants
 TEMP_PDF_DIR = "temp_pdf"
@@ -184,18 +188,36 @@ def main():
 
     # Debug Interface
     if "vector_store" in st.session_state:
-        with st.sidebar.expander("🔍 Debug: Visa databas"):
-            if st.button("Hämta data från Chroma"):
+        with st.sidebar.expander("🔍 Debug: Utforska Databas"):
+            active_path = get_active_db_path()
+            if active_path:
+                st.caption(f"📍 Database Location:")
+                st.code(os.path.abspath(active_path))
+
+            if st.button("Ladda & Visa Data"):
                 try:
                     stored_docs = backend.get_all_documents(st.session_state.vector_store)
-                    st.write(f"Antal chunkar i databasen: {len(stored_docs)}")
-                    for i, doc in enumerate(stored_docs[:5]): # Show first 5 chunks
-                        st.markdown(f"**Chunk {i+1}** (ID: {doc['id']})")
-                        st.caption(f"Metadata: {doc['metadata']}")
-                        st.text(doc['content'][:200] + "...") # Show first 200 chars
-                        st.divider()
-                    if len(stored_docs) > 5:
-                        st.info(f"...och {len(stored_docs) - 5} till.")
+                    st.write(f"📊 Totalt antal text-chunks: **{len(stored_docs)}**")
+
+                    if stored_docs:
+                        # Create a cleaner list for display
+                        data_for_display = []
+                        for doc in stored_docs:
+                            meta = doc.get("metadata", {})
+                            data_for_display.append({
+                                "ID": doc.get("id"),
+                                "Filnamn": meta.get("source", "N/A"),
+                                "Sida": meta.get("page", -1) + 1,
+                                "Innehåll (förhandsvisning)": doc.get("content", "")[:100] + "..."
+                            })
+
+                        if pd:
+                            df = pd.DataFrame(data_for_display)
+                            st.dataframe(df, use_container_width=True)
+                        else:
+                             st.table(data_for_display[:10]) # Fallback if pandas missing
+                             if len(data_for_display) > 10:
+                                 st.info("Showing first 10 rows (install pandas for full table view)")
                 except Exception as e:
                     st.error(f"Kunde inte hämta data: {e}")
 

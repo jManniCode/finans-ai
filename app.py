@@ -167,119 +167,22 @@ def load_session(session_id):
             st.session_state.initial_charts = session_data.get("initial_charts", [])
             st.session_state.current_session_id = session_id
             set_active_db_path(db_path)
-            st.toast(f"Loaded chat: {session_data.get('title')}", icon="📂")
+            # st.toast(f"Loaded chat: {session_data.get('title')}", icon="📂")
     except Exception as e:
         st.error(f"Failed to load session: {e}")
 
-def main():
-    st.set_page_config(page_title="Finans-AI", page_icon="💰", layout="wide")
-    st.title("💰 Finans-AI: Financial Report Analyzer")
+def render_new_analysis_view():
+    """Renders the view for creating a new analysis (uploading files)."""
+    st.header("Starta Ny Analys")
+    st.markdown("Ladda upp dina finansiella rapporter (PDF) för att komma igång.")
 
-    # Initialize session state for messages if not present
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+    with st.container():
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            session_name = st.text_input("Namn på analys (valfritt)", placeholder="T.ex. Apple Q3 2024")
+            uploaded_files = st.file_uploader("Ladda upp PDF-filer", type="pdf", accept_multiple_files=True)
+            process_button = st.button("Processera & Analysera", type="primary")
 
-    # Initialize session state for initial summary charts
-    if "initial_charts" not in st.session_state:
-        st.session_state.initial_charts = []
-
-    if "current_session_id" not in st.session_state:
-        st.session_state.current_session_id = None
-
-    # Check for existing database on startup (only if no session is active)
-    if "vector_store" not in st.session_state:
-        active_db_path = get_active_db_path()
-        if active_db_path:
-            try:
-                embeddings = get_embeddings()
-                vector_store = backend.load_vector_store(active_db_path, embeddings)
-                if vector_store:
-                    st.session_state.vector_store = vector_store
-                    st.session_state.chain = backend.get_conversational_chain(vector_store)
-                    st.toast("Loaded existing database from disk.", icon="💾")
-            except Exception as e:
-                st.error(f"Failed to load existing database: {e}")
-
-    # Lazy cleanup on startup
-    if "cleanup_done" not in st.session_state:
-        cleanup_old_sessions()
-        st.session_state.cleanup_done = True
-
-    # Sidebar
-    with st.sidebar:
-        st.header("Inställningar")
-
-        # Layout Toggle
-        layout_mode = st.radio(
-            "Layout / Visningsläge",
-            ["Desktop (Split View)", "Mobile (Tabs)"],
-            index=0
-        )
-
-        st.divider()
-        st.header("Sparade Chattar")
-
-        # Saved Chats List
-        history = chat_manager.load_chat_history()
-        # Sort by date descending
-        sorted_sessions = sorted(history.items(), key=lambda x: x[1].get("created_at", ""), reverse=True)
-
-        session_options = {sid: data["title"] for sid, data in sorted_sessions}
-
-        # Determine correct index for selectbox
-        options_list = ["new_session"] + list(session_options.keys())
-        default_index = 0
-
-        if st.session_state.current_session_id in session_options:
-            try:
-                # +1 because "new_session" is at index 0
-                default_index = list(session_options.keys()).index(st.session_state.current_session_id) + 1
-            except ValueError:
-                default_index = 0
-
-        # Add "New Chat" option
-        selected_session_id = st.selectbox(
-            "Välj chatt",
-            options=options_list,
-            index=default_index,
-            format_func=lambda x: "➕ Ny Analys" if x == "new_session" else session_options.get(x, "Okänd")
-        )
-
-        # Handle Session Switching
-        if selected_session_id != "new_session":
-            if st.session_state.current_session_id != selected_session_id:
-                load_session(selected_session_id)
-                st.rerun()
-        elif selected_session_id == "new_session" and st.session_state.current_session_id is not None:
-             # User selected "New Analys" but we are currently in a session.
-             # We should essentially "clear" the view to allow upload, but not delete data.
-             # Just clearing the state keys related to the current session view.
-             for key in ["vector_store", "chain", "messages", "initial_charts", "current_session_id"]:
-                if key in st.session_state:
-                    del st.session_state[key]
-             st.rerun()
-
-        if st.session_state.current_session_id:
-             if st.button("🗑️ Ta bort denna chatt"):
-                 chat_manager.delete_chat_session(st.session_state.current_session_id)
-                 clear_current_session() # Effectively resets view
-
-        st.divider()
-        st.header("Upload Reports")
-
-        # Session Name Input (Only relevant for new sessions)
-        session_name = st.text_input("Namn på analys (valfritt)", placeholder="T.ex. Apple Q3 2024")
-
-        uploaded_files = st.file_uploader("Upload PDF files", type="pdf", accept_multiple_files=True)
-
-        process_button = st.button("Process Documents")
-
-        st.divider()
-        with st.expander("🛠️ Debug & Tools"):
-            if st.button("🗑️ Rensa databas", type="primary"):
-                clear_current_session()
-
-    # Processing Logic
     if process_button and uploaded_files:
         # 1. Clear/Create temp directory
         if os.path.exists(TEMP_PDF_DIR):
@@ -342,51 +245,14 @@ def main():
                             initial_charts=initial_charts
                         )
 
-                        st.success("Documents processed successfully! You can now ask questions.")
-                        time.sleep(1) # Brief pause so user sees success message
-                        st.rerun() # Rerun to update sidebar list
+                        st.success("Documents processed successfully!")
+                        time.sleep(1)
+                        st.rerun()
             except Exception as e:
                 st.error(f"An error occurred during processing: {e}")
 
-    # Debug Interface
-    if "vector_store" in st.session_state:
-        with st.sidebar.expander("🔍 Debug: Utforska Databas"):
-            active_path = get_active_db_path()
-            if active_path:
-                st.caption(f"📍 Database Location:")
-                st.code(os.path.abspath(active_path))
-
-            if st.button("Ladda & Visa Data"):
-                try:
-                    stored_docs = backend.get_all_documents(st.session_state.vector_store)
-                    st.write(f"📊 Totalt antal text-chunks: **{len(stored_docs)}**")
-
-                    if stored_docs:
-                        # Create a cleaner list for display
-                        data_for_display = []
-                        for doc in stored_docs:
-                            meta = doc.get("metadata", {})
-                            data_for_display.append({
-                                "ID": doc.get("id"),
-                                "Filnamn": meta.get("source", "N/A"),
-                                "Sida": meta.get("page", -1) + 1,
-                                "Innehåll (förhandsvisning)": doc.get("content", "")[:100] + "..."
-                            })
-
-                        if pd:
-                            df = pd.DataFrame(data_for_display)
-                            try:
-                                st.dataframe(df, width=None, use_container_width=True)
-                            except:
-                                st.dataframe(df)
-                        else:
-                             st.table(data_for_display[:10])
-                             if len(data_for_display) > 10:
-                                 st.info("Showing first 10 rows (install pandas for full table view)")
-                except Exception as e:
-                    st.error(f"Kunde inte hämta data: {e}")
-
-    # Layout Rendering
+def render_active_session_view(layout_mode):
+    """Renders the active chat and chart view."""
 
     # Define containers based on layout mode
     if "Desktop" in layout_mode:
@@ -427,7 +293,7 @@ def main():
                     if st.button("Visa källor", key=f"sources_btn_{i}"):
                         show_sources(message["sources"])
 
-    # Chat Input (Always at bottom, acts globally but we append to chat_container visual flow)
+    # Chat Input
     if prompt := st.chat_input("Ask a question about the financial reports"):
         # Display user message
         st.session_state.messages.append({"role": "user", "content": prompt})
@@ -502,6 +368,155 @@ def main():
             else:
                  with st.chat_message("assistant"):
                     st.warning("Please upload and process documents first.")
+
+def main():
+    st.set_page_config(page_title="Finans-AI", page_icon="💰", layout="wide")
+    # st.title("💰 Finans-AI: Financial Report Analyzer") # Removed to make it cleaner, or keep? Keeping logo in sidebar is better.
+
+    # Initialize session state for messages if not present
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # Initialize session state for initial summary charts
+    if "initial_charts" not in st.session_state:
+        st.session_state.initial_charts = []
+
+    if "current_session_id" not in st.session_state:
+        st.session_state.current_session_id = None
+
+    # Check for existing database on startup (only if no session is active)
+    if "vector_store" not in st.session_state:
+        active_db_path = get_active_db_path()
+        if active_db_path:
+            try:
+                embeddings = get_embeddings()
+                vector_store = backend.load_vector_store(active_db_path, embeddings)
+                if vector_store:
+                    st.session_state.vector_store = vector_store
+                    st.session_state.chain = backend.get_conversational_chain(vector_store)
+                    # Try to match the active DB with a session ID
+                    # This is best effort. If not found, user can start new or load old.
+                    # But ideally we shouldn't auto-load the "Last" if we want a clean state.
+                    # However, to preserve "Reload" functionality (F5), we keep this.
+                    # But we need to know WHICH session ID it corresponds to.
+
+                    history = chat_manager.load_chat_history()
+                    found_session = False
+                    for sid, data in history.items():
+                        if data.get("db_path") and os.path.abspath(data["db_path"]) == os.path.abspath(active_db_path):
+                            st.session_state.current_session_id = sid
+                            st.session_state.messages = data.get("messages", [])
+                            st.session_state.initial_charts = data.get("initial_charts", [])
+                            found_session = True
+                            break
+
+                    if found_session:
+                        st.toast("Restored active session.", icon="🔄")
+                    else:
+                         # If we have a vector store but no matching session ID (maybe deleted?), clear it.
+                         pass
+
+            except Exception as e:
+                # st.error(f"Failed to load existing database: {e}")
+                pass
+
+    # Lazy cleanup on startup
+    if "cleanup_done" not in st.session_state:
+        cleanup_old_sessions()
+        st.session_state.cleanup_done = True
+
+    # Sidebar
+    with st.sidebar:
+        st.title("💰 Finans-AI")
+
+        # New Chat Button
+        if st.button("➕ Ny Analys", type="primary", use_container_width=True):
+             # Clear session state keys to reset view
+             for key in ["vector_store", "chain", "messages", "initial_charts", "current_session_id"]:
+                if key in st.session_state:
+                    del st.session_state[key]
+             st.rerun()
+
+        st.subheader("Historik")
+        # Load history
+        history = chat_manager.load_chat_history()
+        sorted_sessions = sorted(history.items(), key=lambda x: x[1].get("created_at", ""), reverse=True)
+
+        # Display list of sessions
+        for sid, data in sorted_sessions:
+            # Highlight current session? Streamlit buttons don't support "active" state easily visually
+            # but we can disable the current one or just show it.
+            button_label = data["title"]
+            if sid == st.session_state.current_session_id:
+                button_label = f"📂 {button_label}" # Indicate active
+
+            if st.button(button_label, key=sid, use_container_width=True):
+                 if st.session_state.current_session_id != sid:
+                     load_session(sid)
+                     st.rerun()
+
+        st.divider()
+        st.header("Inställningar")
+
+        # Layout Toggle
+        layout_mode = st.radio(
+            "Layout / Visningsläge",
+            ["Desktop (Split View)", "Mobile (Tabs)"],
+            index=0
+        )
+
+        if st.session_state.current_session_id:
+             if st.button("🗑️ Ta bort denna chatt", use_container_width=True):
+                 chat_manager.delete_chat_session(st.session_state.current_session_id)
+                 clear_current_session() # Effectively resets view
+
+        st.divider()
+        with st.expander("🛠️ Debug & Tools"):
+            if st.button("🗑️ Rensa databas", type="primary"):
+                clear_current_session()
+
+            # Debug Interface
+            if "vector_store" in st.session_state:
+                active_path = get_active_db_path()
+                if active_path:
+                    st.caption(f"📍 Database Location:")
+                    st.code(os.path.abspath(active_path))
+
+                if st.button("Ladda & Visa Data"):
+                    try:
+                        stored_docs = backend.get_all_documents(st.session_state.vector_store)
+                        st.write(f"📊 Totalt antal text-chunks: **{len(stored_docs)}**")
+
+                        if stored_docs:
+                            # Create a cleaner list for display
+                            data_for_display = []
+                            for doc in stored_docs:
+                                meta = doc.get("metadata", {})
+                                data_for_display.append({
+                                    "ID": doc.get("id"),
+                                    "Filnamn": meta.get("source", "N/A"),
+                                    "Sida": meta.get("page", -1) + 1,
+                                    "Innehåll (förhandsvisning)": doc.get("content", "")[:100] + "..."
+                                })
+
+                            if pd:
+                                df = pd.DataFrame(data_for_display)
+                                try:
+                                    st.dataframe(df, width=None, use_container_width=True)
+                                except:
+                                    st.dataframe(df)
+                            else:
+                                 st.table(data_for_display[:10])
+                                 if len(data_for_display) > 10:
+                                     st.info("Showing first 10 rows (install pandas for full table view)")
+                    except Exception as e:
+                        st.error(f"Kunde inte hämta data: {e}")
+
+    # Main Content Area Logic
+    if st.session_state.current_session_id is None:
+        render_new_analysis_view()
+    else:
+        render_active_session_view(layout_mode)
 
 if __name__ == "__main__":
     main()

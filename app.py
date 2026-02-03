@@ -305,8 +305,26 @@ def render_active_session_view(layout_mode):
                     if st.button("Visa källor", key=f"sources_btn_{i}"):
                         show_sources(message["sources"])
 
+        # Quick Start Buttons (only if empty)
+        selected_prompt = None
+        if not st.session_state.messages:
+            st.caption("Förslag på frågor:")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                if st.button("Sammanfatta", key="qs_summary", use_container_width=True):
+                    selected_prompt = "Sammanfatta de viktigaste finansiella punkterna i rapporten."
+            with c2:
+                if st.button("Risker", key="qs_risks", use_container_width=True):
+                    selected_prompt = "Vilka är de största riskerna som nämns?"
+            with c3:
+                if st.button("Vinsttrend", key="qs_profit", use_container_width=True):
+                    selected_prompt = "Hur ser vinstutvecklingen ut över tid?"
+
     # Chat Input
-    if prompt := st.chat_input("Ask a question about the financial reports"):
+    chat_input_value = st.chat_input("Ask a question about the financial reports")
+    prompt = chat_input_value or selected_prompt
+
+    if prompt:
         # Display user message
         st.session_state.messages.append({"role": "user", "content": prompt})
 

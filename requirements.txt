@@ -9,3 +9,4 @@ plotly
 python-dotenv
 chromadb
 langchain-chroma
+google-api-core

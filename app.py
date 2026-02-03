@@ -509,7 +509,7 @@ def main():
                             if pd:
                                 df = pd.DataFrame(data_for_display)
                                 try:
-                                    st.dataframe(df, width=None, use_container_width=True)
+                                    st.dataframe(df, width="stretch")
                                 except:
                                     st.dataframe(df)
                             else:

@@ -1,14 +1,16 @@
 import os
 import json
 import re
+import time
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_classic.chains import create_retrieval_chain
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
+from google.api_core.exceptions import ResourceExhausted
 
 # Load environment variables
 load_dotenv()
@@ -207,22 +209,39 @@ def generate_summary_charts(chain):
         "Use Swedish labels for the charts (e.g., 'Omsättning', 'Vinst', 'Tillgångar', 'Skulder')."
     )
 
-    try:
-        response = chain.invoke({"input": prompt_text})
-        answer = response['answer']
+    max_retries = 3
+    base_delay = 5 # seconds
 
-        chart_data_list = []
-        json_matches = re.finditer(r'```json\s*(\{.*?\})\s*```', answer, re.DOTALL)
+    for attempt in range(max_retries):
+        try:
+            response = chain.invoke({"input": prompt_text})
+            answer = response['answer']
 
-        for match in json_matches:
-            json_str = match.group(1)
-            try:
-                data = json.loads(json_str)
-                chart_data_list.append(data)
-            except json.JSONDecodeError:
-                pass
+            chart_data_list = []
+            json_matches = re.finditer(r'```json\s*(\{.*?\})\s*```', answer, re.DOTALL)
 
-        return chart_data_list
-    except Exception as e:
-        print(f"Error generating summary charts: {e}")
-        return []
+            for match in json_matches:
+                json_str = match.group(1)
+                try:
+                    data = json.loads(json_str)
+                    chart_data_list.append(data)
+                except json.JSONDecodeError:
+                    pass
+
+            return chart_data_list
+        except Exception as e:
+            # Check for Rate Limit Error
+            error_str = str(e)
+            if "RESOURCE_EXHAUSTED" in error_str or "429" in error_str:
+                if attempt < max_retries - 1:
+                    sleep_time = base_delay * (2 ** attempt)
+                    print(f"Rate limit hit. Retrying in {sleep_time} seconds...")
+                    time.sleep(sleep_time)
+                    continue
+                else:
+                    print(f"Error generating summary charts (Max retries reached): {e}")
+                    return []
+            else:
+                print(f"Error generating summary charts: {e}")
+                return []
+    return []

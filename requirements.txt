@@ -8,3 +8,4 @@ pypdf
 plotly
 python-dotenv
 chromadb
+langchain-chroma

@@ -1,4 +1,6 @@
 import os
+import json
+import re
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -187,3 +189,40 @@ def get_all_documents(vector_store):
             })
 
     return documents
+
+def generate_summary_charts(chain):
+    """
+    Generates summary charts for key financial metrics using the chain.
+    """
+    prompt_text = (
+        "Analyze the uploaded financial documents. "
+        "Identify key financial metrics available across the provided time periods (years or quarters). "
+        "Specifically, attempt to generate the following charts if data is available: "
+        "1. Revenue Trend (Line or Bar) - showing revenue over time. "
+        "2. Net Profit Trend (Line or Bar) - showing net profit over time. "
+        "3. Operating Expenses (Bar or Pie) - showing breakdown of expenses or trend. "
+        "4. Assets vs Liabilities (Bar) - comparison for the latest period. "
+        "\n\n"
+        "Output ONLY the JSON objects for these charts. Do not output any conversational text. "
+        "Use Swedish labels for the charts (e.g., 'Omsättning', 'Vinst', 'Tillgångar', 'Skulder')."
+    )
+
+    try:
+        response = chain.invoke({"input": prompt_text})
+        answer = response['answer']
+
+        chart_data_list = []
+        json_matches = re.finditer(r'```json\s*(\{.*?\})\s*```', answer, re.DOTALL)
+
+        for match in json_matches:
+            json_str = match.group(1)
+            try:
+                data = json.loads(json_str)
+                chart_data_list.append(data)
+            except json.JSONDecodeError:
+                pass
+
+        return chart_data_list
+    except Exception as e:
+        print(f"Error generating summary charts: {e}")
+        return []

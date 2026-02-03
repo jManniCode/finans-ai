@@ -56,7 +56,7 @@ def render_chart(chart_data):
 
         fig.update_layout(title=title)
 
-        st.plotly_chart(fig)
+        st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
         st.error(f"Error rendering chart: {e}")
 
@@ -105,12 +105,16 @@ def cleanup_old_sessions():
                 print(f"Error cleaning up {item}: {e}")
 
 def main():
-    st.set_page_config(page_title="Finans-AI", page_icon="💰")
+    st.set_page_config(page_title="Finans-AI", page_icon="💰", layout="wide")
     st.title("💰 Finans-AI: Financial Report Analyzer")
 
     # Initialize session state for messages if not present
     if "messages" not in st.session_state:
         st.session_state.messages = []
+
+    # Initialize session state for initial summary charts
+    if "initial_charts" not in st.session_state:
+        st.session_state.initial_charts = []
 
     # Check for existing database on startup
     if "vector_store" not in st.session_state:
@@ -133,6 +137,15 @@ def main():
 
     # Sidebar
     with st.sidebar:
+        st.header("Inställningar")
+
+        # Layout Toggle
+        layout_mode = st.radio(
+            "Layout / Visningsläge",
+            ["Desktop (Split View)", "Mobile (Tabs)"],
+            index=0
+        )
+
         st.header("Upload Reports")
         uploaded_files = st.file_uploader("Upload PDF files", type="pdf", accept_multiple_files=True)
 
@@ -182,6 +195,12 @@ def main():
                         st.session_state.vector_store = vector_store
                         # Clear chat history to start fresh
                         st.session_state.messages = []
+
+                        # Generate Summary Charts
+                        st.toast("Generating summary charts...", icon="📊")
+                        initial_charts = backend.generate_summary_charts(chain)
+                        st.session_state.initial_charts = initial_charts
+
                         st.success("Documents processed successfully! You can now ask questions.")
             except Exception as e:
                 st.error(f"An error occurred during processing: {e}")
@@ -213,109 +232,126 @@ def main():
 
                         if pd:
                             df = pd.DataFrame(data_for_display)
-                            # Updated to suppress deprecation warning (use_container_width -> width='stretch')
-                            # Note: width='stretch' might not be available in very old Streamlit versions,
-                            # but is the recommendation for newer ones.
                             try:
                                 st.dataframe(df, width=None, use_container_width=True)
-                                # Retaining use_container_width for now as 'width="stretch"' behaves differently in some versions
-                                # or simply ignore the warning if upgrading is not an option.
-                                # Actually, let's just stick to what works and is compatible.
-                                # The warning says: For use_container_width=True, use width='stretch'.
-                                # Let's try to be safe.
                             except:
                                 st.dataframe(df)
                         else:
-                             st.table(data_for_display[:10]) # Fallback if pandas missing
+                             st.table(data_for_display[:10])
                              if len(data_for_display) > 10:
                                  st.info("Showing first 10 rows (install pandas for full table view)")
                 except Exception as e:
                     st.error(f"Kunde inte hämta data: {e}")
 
-    # Chat Interface
-    for i, message in enumerate(st.session_state.messages):
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-            if "chart_data" in message:
-                # Handle single chart or list of charts
-                data = message["chart_data"]
-                if isinstance(data, list):
-                    for chart in data:
-                        render_chart(chart)
-                else:
-                    render_chart(data)
-            if "sources" in message:
-                if st.button("Visa källor", key=f"sources_btn_{i}"):
-                    show_sources(message["sources"])
+    # Layout Rendering
 
+    # Define containers based on layout mode
+    if "Desktop" in layout_mode:
+        col_charts, col_chat = st.columns([1, 1])
+        chart_container = col_charts
+        chat_container = col_chat
+    else:
+        tab_charts, tab_chat = st.tabs(["📊 Charts", "💬 Chat"])
+        chart_container = tab_charts
+        chat_container = tab_chat
+
+    # Render Charts in Chart Container
+    with chart_container:
+        st.subheader("Finansiell Översikt")
+        if "initial_charts" in st.session_state and st.session_state.initial_charts:
+            for chart in st.session_state.initial_charts:
+                render_chart(chart)
+        elif "chain" in st.session_state:
+             st.info("No automatic charts could be generated from the provided documents. Try asking for specific data in the chat.")
+        else:
+             st.info("Upload documents to generate summary charts.")
+
+    # Render Chat in Chat Container
+    with chat_container:
+        st.subheader("Chat")
+        # Display chat messages
+        for i, message in enumerate(st.session_state.messages):
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+                if "chart_data" in message:
+                    data = message["chart_data"]
+                    if isinstance(data, list):
+                        for chart in data:
+                            render_chart(chart)
+                    else:
+                        render_chart(data)
+                if "sources" in message:
+                    if st.button("Visa källor", key=f"sources_btn_{i}"):
+                        show_sources(message["sources"])
+
+    # Chat Input (Always at bottom, acts globally but we append to chat_container visual flow)
     if prompt := st.chat_input("Ask a question about the financial reports"):
         # Display user message
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
 
-        # Generate response
-        if "chain" in st.session_state:
-            with st.chat_message("assistant"):
-                with st.spinner("Thinking..."):
-                    try:
-                        response = st.session_state.chain.invoke({"input": prompt})
-                        answer = response['answer']
+        # We manually render the user message in the chat container so it appears immediately
+        with chat_container:
+            with st.chat_message("user"):
+                st.markdown(prompt)
 
-                        # Extract JSON
-                        chart_data_list = []
-                        # Find all JSON blocks
-                        json_matches = re.finditer(r'```json\s*(\{.*?\})\s*```', answer, re.DOTALL)
+            # Generate response
+            if "chain" in st.session_state:
+                with st.chat_message("assistant"):
+                    with st.spinner("Thinking..."):
+                        try:
+                            response = st.session_state.chain.invoke({"input": prompt})
+                            answer = response['answer']
 
-                        for match in json_matches:
-                            json_str = match.group(1)
-                            try:
-                                data = json.loads(json_str)
-                                chart_data_list.append(data)
-                                # Remove the JSON block from the answer
-                                answer = answer.replace(match.group(0), "")
-                            except json.JSONDecodeError:
-                                pass
+                            # Extract JSON
+                            chart_data_list = []
+                            # Find all JSON blocks
+                            json_matches = re.finditer(r'```json\s*(\{.*?\})\s*```', answer, re.DOTALL)
 
-                        answer = answer.strip()
-                        st.markdown(answer)
+                            for match in json_matches:
+                                json_str = match.group(1)
+                                try:
+                                    data = json.loads(json_str)
+                                    chart_data_list.append(data)
+                                    # Remove the JSON block from the answer
+                                    answer = answer.replace(match.group(0), "")
+                                except json.JSONDecodeError:
+                                    pass
 
-                        for chart in chart_data_list:
-                            render_chart(chart)
+                            answer = answer.strip()
+                            st.markdown(answer)
 
-                        # Process sources
-                        sources_text = []
-                        if "context" in response:
-                            # Sort documents by page number for user-friendly display
-                            sorted_docs = sorted(response["context"], key=lambda x: x.metadata.get('page', 0))
+                            for chart in chart_data_list:
+                                render_chart(chart)
 
-                            # Display all retrieved sources so the user can verify all citations
-                            for doc in sorted_docs:
-                                # Add 1 to page number for user-friendly display (assuming 0-indexed)
-                                page = doc.metadata.get('page', -1) + 1
-                                # Show full content to allow verifying numbers
-                                source_info = f"**Sida {page}:**\n{doc.page_content}"
-                                sources_text.append(source_info)
+                            # Process sources
+                            sources_text = []
+                            if "context" in response:
+                                # Sort documents by page number
+                                sorted_docs = sorted(response["context"], key=lambda x: x.metadata.get('page', 0))
 
-                        # Append message first so we have the index for the key
-                        st.session_state.messages.append({
-                            "role": "assistant",
-                            "content": answer,
-                            "sources": sources_text,
-                            "chart_data": chart_data_list
-                        })
+                                for doc in sorted_docs:
+                                    page = doc.metadata.get('page', -1) + 1
+                                    source_info = f"**Sida {page}:**\n{doc.page_content}"
+                                    sources_text.append(source_info)
 
-                        # Show button for the new message
-                        if sources_text:
-                            # Use a unique key based on the length of messages (which is the index of this new message)
-                            if st.button("Visa källor", key=f"sources_btn_{len(st.session_state.messages)-1}"):
-                                show_sources(sources_text)
+                            # Append message to state
+                            st.session_state.messages.append({
+                                "role": "assistant",
+                                "content": answer,
+                                "sources": sources_text,
+                                "chart_data": chart_data_list
+                            })
 
-                    except Exception as e:
-                        st.error(f"Error generating response: {e}")
-        else:
-            with st.chat_message("assistant"):
-                st.warning("Please upload and process documents first.")
+                            # Show button for the new message
+                            if sources_text:
+                                if st.button("Visa källor", key=f"sources_btn_{len(st.session_state.messages)-1}"):
+                                    show_sources(sources_text)
+
+                        except Exception as e:
+                            st.error(f"Error generating response: {e}")
+            else:
+                 with st.chat_message("assistant"):
+                    st.warning("Please upload and process documents first.")
 
 if __name__ == "__main__":
     main()

@@ -290,6 +290,13 @@ def render_active_session_view(layout_mode):
     # Render Chat in Chat Container
     with chat_container:
         st.subheader("Chat")
+
+        # Empty State Guidance
+        if not st.session_state.messages:
+            st.markdown("#### 👋 Välkommen!")
+            st.markdown("Jag har analyserat dina dokument och är redo att svara på frågor.")
+            st.caption("Använd snabbvalen nedan eller skriv din egen fråga för att komma igång.")
+
         # Display chat messages
         for i, message in enumerate(st.session_state.messages):
             with st.chat_message(message["role"]):

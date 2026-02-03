@@ -179,7 +179,7 @@ def render_new_analysis_view():
     with st.container():
         col1, col2 = st.columns([2, 1])
         with col1:
-            session_name = st.text_input("Namn på analys (valfritt)", placeholder="T.ex. Apple Q3 2024")
+            session_name = st.text_input("Namn på analys (valfritt)")
             uploaded_files = st.file_uploader("Ladda upp PDF-filer", type="pdf", accept_multiple_files=True)
             process_button = st.button("Processera & Analysera", type="primary")
 

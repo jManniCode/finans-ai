@@ -80,6 +80,18 @@ def set_active_db_path(path):
     with open(ACTIVE_DB_FILE, "w") as f:
         f.write(path)
 
+@st.dialog("Ta bort analys?")
+def confirm_delete_session(session_id):
+    st.write("Är du säker på att du vill ta bort denna analys? Detta går inte att ångra.")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Avbryt", width="stretch"):
+            st.rerun()
+    with col2:
+        if st.button("Ta bort", type="primary", width="stretch"):
+            chat_manager.delete_chat_session(session_id)
+            clear_current_session()
+
 def cleanup_old_sessions():
     """
     Attempts to clean up old database directories.
@@ -474,8 +486,7 @@ def main():
 
         if st.session_state.current_session_id:
              if st.button("🗑️ Ta bort denna chatt", width="stretch"):
-                 chat_manager.delete_chat_session(st.session_state.current_session_id)
-                 clear_current_session() # Effectively resets view
+                 confirm_delete_session(st.session_state.current_session_id)
 
         st.divider()
         with st.expander("🛠️ Debug & Tools"):

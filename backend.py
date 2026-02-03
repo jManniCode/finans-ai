@@ -45,13 +45,17 @@ def split_text(documents):
     # Embed page number into the content of each chunk
     for chunk in chunks:
         page_num = chunk.metadata.get('page', -1) + 1  # Assuming 0-indexed pages
-        chunk.page_content = f"[Page {page_num}] {chunk.page_content}"
+
         # Ensure 'source' is in metadata, defaulting to 'unknown' if missing
         if 'source' not in chunk.metadata:
-            chunk.metadata['source'] = 'unknown'
-        # Clean up source path to just filename for cleaner display
+            source_name = 'unknown'
+            chunk.metadata['source'] = source_name
         else:
-             chunk.metadata['source'] = os.path.basename(chunk.metadata['source'])
+            source_name = os.path.basename(chunk.metadata['source'])
+            chunk.metadata['source'] = source_name
+
+        # Embed Source and Page number into the content
+        chunk.page_content = f"[Source: {source_name}] [Page {page_num}] {chunk.page_content}"
 
     return chunks
 
@@ -131,7 +135,8 @@ def get_conversational_chain(vector_store):
         "If the user asks for a summary, provide a concise and factual financial summary based on the context. "
         "If the user asks about the sentiment, assess the overall tone (e.g., positive, negative, neutral, cautious) based on the context and explain your reasoning. "
         "When answering, you MUST cite the source page number for every fact you mention. "
-        "The text chunks provided contain page numbers in the format '[Page X]'. Use these tags to ensure your citations are accurate. "
+        "The text chunks provided contain the source filename and page numbers in the format '[Source: filename] [Page X]'. "
+        "You can use the source filename to identify the company or document being analyzed. "
         "Format citations as [Page X]. Example: 'Revenue increased by 10% [Page 3]'. "
         "If the answer is not in the context, say that you don't know. "
         "Keep the answer concise."

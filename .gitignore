@@ -11,3 +11,6 @@ temp_pdf/
 chroma_db/
 chroma_data/
 active_db.txt
+
+# Chat History
+chat_history.json

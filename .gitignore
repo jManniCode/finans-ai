@@ -3,3 +3,11 @@ venv/
 __pycache__/
 *.pdf
 .DS_Store
+
+# Temporary directories
+temp_pdf/
+
+# Vector Database (Chroma)
+chroma_db/
+chroma_data/
+active_db.txt

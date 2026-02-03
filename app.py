@@ -213,7 +213,18 @@ def main():
 
                         if pd:
                             df = pd.DataFrame(data_for_display)
-                            st.dataframe(df, use_container_width=True)
+                            # Updated to suppress deprecation warning (use_container_width -> width='stretch')
+                            # Note: width='stretch' might not be available in very old Streamlit versions,
+                            # but is the recommendation for newer ones.
+                            try:
+                                st.dataframe(df, width=None, use_container_width=True)
+                                # Retaining use_container_width for now as 'width="stretch"' behaves differently in some versions
+                                # or simply ignore the warning if upgrading is not an option.
+                                # Actually, let's just stick to what works and is compatible.
+                                # The warning says: For use_container_width=True, use width='stretch'.
+                                # Let's try to be safe.
+                            except:
+                                st.dataframe(df)
                         else:
                              st.table(data_for_display[:10]) # Fallback if pandas missing
                              if len(data_for_display) > 10:

@@ -290,6 +290,22 @@ def render_active_session_view(layout_mode):
         col_charts, col_chat = st.columns([1, 1])
         chart_container = col_charts
         chat_container = col_chat
+
+        # CSS to add a vertical divider line between the columns
+        # Note: This is a hack. To avoid targeting ALL columns (like buttons),
+        # we try to target the top-level horizontal block.
+        # Since we can't easily distinguish them by class, we stick to the simple version
+        # but acknowledge the trade-off.
+        # Ideally, we would wrap this in a container with a specific ID if Streamlit allowed custom IDs easily.
+        st.markdown("""
+            <style>
+            div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-of-type(1) {
+                border-right: 1px solid #e0e0e0;
+                padding-right: 1rem;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
     else:
         tab_charts, tab_chat = st.tabs(["📊 Charts", "💬 Chat"])
         chart_container = tab_charts
@@ -357,23 +373,28 @@ def render_active_session_view(layout_mode):
                     if st.button("Visa källor", key=f"sources_btn_{i}"):
                         show_sources(message["sources"])
 
-    # Quick Start Buttons (Persistent)
-    selected_prompt = None
+    # Quick Start Buttons & Input (Moved inside Chat Container/Logic to hide in Mobile Charts tab)
+    # Note: Streamlit executes top-down. If we are in 'Mobile' layout, we only want these to appear in the Chat tab.
+    # Since we are using 'with chat_container:', anything we render here goes into that column/tab.
 
-    # Render outside chat container to keep them near the input
-    st.caption("Förslag på frågor:")
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        if st.button("Sammanfatta", key="qs_summary", use_container_width=True, help="Sammanfatta de viktigaste finansiella punkterna i rapporten."):
-            selected_prompt = "Sammanfatta de viktigaste finansiella punkterna i rapporten."
-    with c2:
-        if st.button("Risker", key="qs_risks", use_container_width=True, help="Vilka är de största riskerna som nämns?"):
-            selected_prompt = "Vilka är de största riskerna som nämns?"
-    with c3:
-        if st.button("Vinsttrend", key="qs_profit", use_container_width=True, help="Hur ser vinstutvecklingen ut över tid?"):
-            selected_prompt = "Hur ser vinstutvecklingen ut över tid?"
+    selected_prompt = None
+    with chat_container:
+        # Render Quick Start Buttons
+        st.markdown("#### Förslag på frågor:") # Using header instead of caption to ensure visibility
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            if st.button("Sammanfatta", key="qs_summary", use_container_width=True, help="Sammanfatta de viktigaste finansiella punkterna i rapporten."):
+                selected_prompt = "Sammanfatta de viktigaste finansiella punkterna i rapporten."
+        with c2:
+            if st.button("Risker", key="qs_risks", use_container_width=True, help="Vilka är de största riskerna som nämns?"):
+                selected_prompt = "Vilka är de största riskerna som nämns?"
+        with c3:
+            if st.button("Vinsttrend", key="qs_profit", use_container_width=True, help="Hur ser vinstutvecklingen ut över tid?"):
+                selected_prompt = "Hur ser vinstutvecklingen ut över tid?"
 
     # Chat Input
+    # Input is special in Streamlit; it's always pinned to bottom.
+    # But visually it belongs to the chat context.
     chat_input_value = st.chat_input("Ställ en fråga om de finansiella rapporterna")
     prompt = chat_input_value or selected_prompt
 

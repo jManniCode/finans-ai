@@ -19,3 +19,7 @@
 ## 2026-02-07 - Language Consistency & Trust
 **Learning:** Inconsistent language (e.g., English placeholders in a Swedish interface) breaks immersion and signals "unfinished software," reducing user trust.
 **Action:** Rigorously audit all default UI text, including placeholders, tooltips, and loading states, to ensure they match the primary application language.
+
+## 2026-02-07 - The Limits of CSS Hacks in Frameworks
+**Learning:** Adding custom styling (like vertical dividers) in low-code frameworks like Streamlit often requires CSS hacks that rely on internal class names. These are brittle and can have unintended side effects (e.g., affecting all columns globally).
+**Action:** Use standard framework components whenever possible. If custom styling is required, document the trade-offs and potential side effects clearly in the code, or advocate for native support/plugins.

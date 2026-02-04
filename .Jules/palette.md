@@ -23,3 +23,7 @@
 ## 2026-02-07 - The Limits of CSS Hacks in Frameworks
 **Learning:** Adding custom styling (like vertical dividers) in low-code frameworks like Streamlit often requires CSS hacks that rely on internal class names. These are brittle and can have unintended side effects (e.g., affecting all columns globally).
 **Action:** Use standard framework components whenever possible. If custom styling is required, document the trade-offs and potential side effects clearly in the code, or advocate for native support/plugins.
+
+## 2026-02-08 - Empty Navigation Areas
+**Learning:** An empty sidebar or navigation menu can look broken or incomplete, leading users to wonder if the app has failed to load data.
+**Action:** Populate empty navigation areas with a reassuring "No items yet" message that explains how to populate the list (e.g., "Saved items appear here").

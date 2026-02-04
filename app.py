@@ -554,6 +554,9 @@ def main():
         sorted_sessions = sorted(history.items(), key=lambda x: x[1].get("created_at", ""), reverse=True)
 
         # Display list of sessions
+        if not sorted_sessions:
+            st.info("Inga sparade analyser än. När du startar en ny analys sparas den här automatiskt.", icon="📂")
+
         for sid, data in sorted_sessions:
             # Highlight current session? Streamlit buttons don't support "active" state easily visually
             # but we can disable the current one or just show it.

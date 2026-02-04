@@ -203,73 +203,76 @@ def render_new_analysis_view():
             uploaded_files = st.file_uploader("Ladda upp PDF-filer", type="pdf", accept_multiple_files=True)
             process_button = st.button("Processera & Analysera", type="primary")
 
-    if process_button and uploaded_files:
-        # 1. Clear/Create temp directory
-        if os.path.exists(TEMP_PDF_DIR):
-            shutil.rmtree(TEMP_PDF_DIR)
-        os.makedirs(TEMP_PDF_DIR)
+    if process_button:
+        if not uploaded_files:
+            st.error("Du måste ladda upp minst en PDF-fil för att starta analysen.")
+        else:
+            # 1. Clear/Create temp directory
+            if os.path.exists(TEMP_PDF_DIR):
+                shutil.rmtree(TEMP_PDF_DIR)
+            os.makedirs(TEMP_PDF_DIR)
 
-        # Create a UNIQUE directory for this run to avoid file locks on Windows
-        if not os.path.exists(CHROMA_DATA_ROOT):
-            os.makedirs(CHROMA_DATA_ROOT)
+            # Create a UNIQUE directory for this run to avoid file locks on Windows
+            if not os.path.exists(CHROMA_DATA_ROOT):
+                os.makedirs(CHROMA_DATA_ROOT)
 
-        new_db_path = os.path.join(CHROMA_DATA_ROOT, f"session_{uuid.uuid4()}")
+            new_db_path = os.path.join(CHROMA_DATA_ROOT, f"session_{uuid.uuid4()}")
 
-        # 2. Save files
-        with st.spinner("Saving uploaded files..."):
-            for uploaded_file in uploaded_files:
-                file_path = os.path.join(TEMP_PDF_DIR, uploaded_file.name)
-                with open(file_path, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
+            # 2. Save files
+            with st.spinner("Saving uploaded files..."):
+                for uploaded_file in uploaded_files:
+                    file_path = os.path.join(TEMP_PDF_DIR, uploaded_file.name)
+                    with open(file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
 
-        # 3. Process
-        with st.spinner("Processing documents..."):
-            try:
-                # Check for API Key
-                if not os.getenv("GOOGLE_API_KEY"):
-                    st.error("GOOGLE_API_KEY is missing. Please set it in the .env file.")
-                else:
-                    documents = backend.load_pdfs(TEMP_PDF_DIR)
-                    if not documents:
-                        st.warning("No text could be extracted from the PDFs.")
+            # 3. Process
+            with st.spinner("Processing documents..."):
+                try:
+                    # Check for API Key
+                    if not os.getenv("GOOGLE_API_KEY"):
+                        st.error("GOOGLE_API_KEY is missing. Please set it in the .env file.")
                     else:
-                        chunks = backend.split_text(documents)
-                        embeddings = get_embeddings()
-                        vector_store = backend.create_vector_store(chunks, embeddings=embeddings, persist_directory=new_db_path)
-                        chain = backend.get_conversational_chain(vector_store)
+                        documents = backend.load_pdfs(TEMP_PDF_DIR)
+                        if not documents:
+                            st.warning("No text could be extracted from the PDFs.")
+                        else:
+                            chunks = backend.split_text(documents)
+                            embeddings = get_embeddings()
+                            vector_store = backend.create_vector_store(chunks, embeddings=embeddings, persist_directory=new_db_path)
+                            chain = backend.get_conversational_chain(vector_store)
 
-                        # Update active pointer
-                        set_active_db_path(new_db_path)
+                            # Update active pointer
+                            set_active_db_path(new_db_path)
 
-                        # Store chain and vector_store in session state
-                        st.session_state.chain = chain
-                        st.session_state.vector_store = vector_store
-                        st.session_state.messages = []
+                            # Store chain and vector_store in session state
+                            st.session_state.chain = chain
+                            st.session_state.vector_store = vector_store
+                            st.session_state.messages = []
 
-                        # Generate Summary Charts
-                        st.toast("Generating summary charts...", icon="📊")
-                        initial_charts = backend.generate_summary_charts(chain)
-                        st.session_state.initial_charts = initial_charts
+                            # Generate Summary Charts
+                            st.toast("Generating summary charts...", icon="📊")
+                            initial_charts = backend.generate_summary_charts(chain)
+                            st.session_state.initial_charts = initial_charts
 
-                        # Create Persistent Session
-                        if not session_name:
-                            session_name = uploaded_files[0].name
+                            # Create Persistent Session
+                            if not session_name:
+                                session_name = uploaded_files[0].name
 
-                        new_session_id = chat_manager.create_chat_session(session_name, new_db_path)
-                        st.session_state.current_session_id = new_session_id
+                            new_session_id = chat_manager.create_chat_session(session_name, new_db_path)
+                            st.session_state.current_session_id = new_session_id
 
-                        # Save initial state
-                        chat_manager.update_chat_session(
-                            new_session_id,
-                            messages=[],
-                            initial_charts=initial_charts
-                        )
+                            # Save initial state
+                            chat_manager.update_chat_session(
+                                new_session_id,
+                                messages=[],
+                                initial_charts=initial_charts
+                            )
 
-                        st.success("Documents processed successfully!")
-                        time.sleep(1)
-                        st.rerun()
-            except Exception as e:
-                st.error(f"An error occurred during processing: {e}")
+                            st.success("Documents processed successfully!")
+                            time.sleep(1)
+                            st.rerun()
+                except Exception as e:
+                    st.error(f"An error occurred during processing: {e}")
 
 def render_active_session_view(layout_mode):
     """Renders the active chat and chart view."""
@@ -353,13 +356,13 @@ def render_active_session_view(layout_mode):
     st.caption("Förslag på frågor:")
     c1, c2, c3 = st.columns(3)
     with c1:
-        if st.button("Sammanfatta", key="qs_summary", use_container_width=True):
+        if st.button("Sammanfatta", key="qs_summary", use_container_width=True, help="Sammanfatta de viktigaste finansiella punkterna i rapporten."):
             selected_prompt = "Sammanfatta de viktigaste finansiella punkterna i rapporten."
     with c2:
-        if st.button("Risker", key="qs_risks", use_container_width=True):
+        if st.button("Risker", key="qs_risks", use_container_width=True, help="Vilka är de största riskerna som nämns?"):
             selected_prompt = "Vilka är de största riskerna som nämns?"
     with c3:
-        if st.button("Vinsttrend", key="qs_profit", use_container_width=True):
+        if st.button("Vinsttrend", key="qs_profit", use_container_width=True, help="Hur ser vinstutvecklingen ut över tid?"):
             selected_prompt = "Hur ser vinstutvecklingen ut över tid?"
 
     # Chat Input

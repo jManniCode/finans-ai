@@ -330,7 +330,7 @@ def render_active_session_view(layout_mode):
 
         # Empty State Guidance
         if not st.session_state.messages:
-            st.markdown("#### 👋 Välkommen!")
+            st.markdown("#### Välkommen!")
             st.markdown("Jag har analyserat dina dokument och är redo att svara på frågor.")
             st.caption("Använd snabbvalen nedan eller skriv din egen fråga för att komma igång.")
 
@@ -504,7 +504,7 @@ def main():
 
     # Sidebar
     with st.sidebar:
-        st.title("💰 Finans-AI")
+        st.title("Finans-AI")
 
         # New Chat Button
         if st.button("➕ Ny Analys", type="primary", width="stretch"):

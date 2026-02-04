@@ -3,10 +3,12 @@ langchain-community
 langchain-text-splitters
 langchain-google-genai
 langchain-classic
-streamlit
 pypdf
 plotly
 python-dotenv
 chromadb
 langchain-chroma
 google-api-core
+fastapi
+uvicorn
+python-multipart

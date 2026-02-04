@@ -158,6 +158,7 @@ def get_conversational_chain(vector_store):
         "    ]\n"
         "}}\n"
         "```\n"
+        "IMPORTANT: You must use the key 'value' for the numerical data. Do not use 'amount', 'total', or any other key."
         "Ensure the graph title and labels are in the same language as the answer. "
         "Do not include this JSON if the data is not suitable for a chart."
         "\n\n"

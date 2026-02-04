@@ -43,7 +43,15 @@ def render_chart(chart_data):
 
         # Ensure labels are strings to force categorical axis
         labels = [str(item["label"]) for item in data]
-        values = [item["value"] for item in data]
+        # Robustly get values (handle 'amount', 'value', or missing keys)
+        values = []
+        for item in data:
+            val = item.get("value")
+            if val is None:
+                val = item.get("amount") # Common LLM hallucination
+            if val is None:
+                val = 0 # Fallback
+            values.append(val)
 
         fig = go.Figure()
 

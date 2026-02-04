@@ -15,3 +15,7 @@
 ## 2026-02-06 - Gulf of Execution & Silent Failures
 **Learning:** When a primary action button (like "Process") does nothing because of missing input, users feel confused and assume the system is broken ("Silent Failure").
 **Action:** Always provide immediate, explicit feedback (error message or disabled state) when a required condition isn't met, and use tooltips to explain what ambiguous buttons will actually do.
+
+## 2026-02-07 - Language Consistency & Trust
+**Learning:** Inconsistent language (e.g., English placeholders in a Swedish interface) breaks immersion and signals "unfinished software," reducing user trust.
+**Action:** Rigorously audit all default UI text, including placeholders, tooltips, and loading states, to ensure they match the primary application language.

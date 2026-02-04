@@ -201,7 +201,15 @@ def render_new_analysis_view():
         with col1:
             session_name = st.text_input("Namn på analys (valfritt)")
             uploaded_files = st.file_uploader("Ladda upp PDF-filer", type="pdf", accept_multiple_files=True)
-            process_button = st.button("Processera & Analysera", type="primary")
+
+            # UX: Disable button if no files to prevent "Gulf of Execution"
+            help_text = "Starta analysen av dina dokument" if uploaded_files else "Ladda upp minst en PDF-fil först"
+            process_button = st.button(
+                "Processera & Analysera",
+                type="primary",
+                disabled=not uploaded_files,
+                help=help_text
+            )
 
     if process_button:
         if not uploaded_files:
@@ -366,7 +374,7 @@ def render_active_session_view(layout_mode):
             selected_prompt = "Hur ser vinstutvecklingen ut över tid?"
 
     # Chat Input
-    chat_input_value = st.chat_input("Ask a question about the financial reports")
+    chat_input_value = st.chat_input("Ställ en fråga om de finansiella rapporterna")
     prompt = chat_input_value or selected_prompt
 
     if prompt:

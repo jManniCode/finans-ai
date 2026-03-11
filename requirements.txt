@@ -10,3 +10,6 @@ python-dotenv
 chromadb
 langchain-chroma
 google-api-core
+pandas
+ragas
+datasets
